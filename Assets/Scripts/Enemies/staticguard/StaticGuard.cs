@@ -12,6 +12,9 @@ namespace Project.Enemies.StaticGuard
         public Transform facing;                       // child pointing right
         [SerializeField] SpriteRenderer facingSprite;  // optional
 
+        [Header("Env")]
+        [Range(0f, 1f)] public float ambientDarkness = 0.2f;
+
         [Header("Tuning")]
         public PerceptionTuning tuning = PerceptionTuning.Normal;
         public float calmRate = 1f;        // seconds of cooldown per second out of FOV
@@ -35,10 +38,10 @@ namespace Project.Enemies.StaticGuard
 
         void Update()
         {
-            if (signals == null || player == null) return;
+            if (player == null) return;
 
             Vector2 guardPos = transform.position;
-            Vector2 playerPos = signals.WorldPosition;
+            Vector2 playerPos = (Vector2)player.position;
             Vector2 toPlayer = playerPos - guardPos;
             float dist = toPlayer.magnitude;
 
@@ -46,8 +49,13 @@ namespace Project.Enemies.StaticGuard
             Vector2 forward = facing ? (Vector2)facing.right : (Vector2)transform.right;
             bool inFov = los && PerceptionMath.InFOV(forward, toPlayer, tuning.fovDeg);
 
-            float Vraw = Mathf.Clamp01(signals.Visibility);
-            float N = Mathf.Clamp01(signals.Noise);
+            // Raw environment visibility at the target position
+            float Vraw = VisibilityField.SampleAt(playerPos, ambientDarkness);
+
+            // Optional noise from player signals (if available)
+            float N = signals != null ? Mathf.Clamp01(signals.Noise) : 0f;
+
+            // Only count visual visibility while in cone and with LOS
             float V = inFov ? Vraw : 0f;
 
             float visFall = PerceptionMath.VisFalloff(dist, tuning.visRange);
@@ -69,7 +77,7 @@ namespace Project.Enemies.StaticGuard
                         OnAlertExit();
                     }
                 }
-                return; // while spotted, no further processing
+                return;
             }
 
             // Instant-spot rules

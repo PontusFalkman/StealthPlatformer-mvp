@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4e2768f70a947843886d1476307d813, type: 3}
   m_Name: VisibilitySettings
   m_EditorClassIdentifier: 
-  ambientDarkness: 1
+  ambientDarkness: 0.3
   lightBlend: 1
   sampleRadius: 0.25
   smoothing: 10
