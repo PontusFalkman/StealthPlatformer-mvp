@@ -6,7 +6,9 @@ public class PlayerMovement : MonoBehaviour
 {
     [Header("Refs")]
     public MonoBehaviour inputProvider; // must implement IPlayerInput
+    public MonoBehaviour stanceProvider; // must implement IStanceProvider (optional)
     IPlayerInput input;
+    IStanceProvider stance;
     Rigidbody2D rb;
     FootstepEmitter steps;                 // optional
     ActionNoiseEmitter actions;            // optional
@@ -51,6 +53,9 @@ public class PlayerMovement : MonoBehaviour
             Debug.LogError("inputProvider must implement IPlayerInput", this);
         if (input == null)
             Debug.LogError("No IPlayerInput found. Add InputSystemPlayerInput or assign inputProvider.", this);
+
+        stance = stanceProvider as IStanceProvider;
+        if (stance == null) stance = GetComponent<IStanceProvider>();
 
         gravity = (2f * jumpHeight) / (timeToApex * timeToApex);
         jumpVel = gravity * timeToApex;
@@ -112,7 +117,9 @@ public class PlayerMovement : MonoBehaviour
     void FixedUpdate()
     {
         float x = input != null ? Mathf.Clamp(input.MoveX, -1f, 1f) : 0f;
-        float target = x * maxSpeed;
+        float stanceMult = stance != null ? stance.SpeedMult : 1f;
+
+        float target = x * maxSpeed * stanceMult;
 
         float a = grounded
             ? (Mathf.Abs(target) > 0.01f ? accel : decel)

@@ -1,4 +1,3 @@
-// Scripts/Player/PlayerVisibilityMeter.cs
 using System;
 using UnityEngine;
 
@@ -6,6 +5,10 @@ public class PlayerVisibilityMeter : MonoBehaviour
 {
     [Header("Settings")]
     public VisibilitySettings settings;
+
+    [Header("Optional stance")]
+    public MonoBehaviour stanceProvider; // IStanceProvider
+    IStanceProvider stance;
 
     public float CurrentValue => _current;
     public event Action<float> OnChanged;
@@ -15,12 +18,18 @@ public class PlayerVisibilityMeter : MonoBehaviour
     float _current;
     VisibilityLevelTag levelTag;  // NEW
 
-    void Awake() { levelTag = GetComponentInParent<VisibilityLevelTag>(); }
+    void Awake()
+    {
+        levelTag = GetComponentInParent<VisibilityLevelTag>();
+        stance = stanceProvider as IStanceProvider;
+        if (stance == null) stance = GetComponent<IStanceProvider>();
+    }
 
     void OnEnable()
     {
         float env0 = SampleEnv(transform.position);
-        _current = Mathf.Clamp01(env0);
+        float stanceMult = stance != null ? Mathf.Max(0f, stance.VisibilityMult) : 1f;
+        _current = Mathf.Clamp01(env0 * stanceMult);
         OnChanged?.Invoke(_current);
     }
 
@@ -30,7 +39,8 @@ public class PlayerVisibilityMeter : MonoBehaviour
         Vector2 p = transform.position;
 
         float env = SampleEnv(p);
-        float target = Mathf.Clamp01(env);
+        float stanceMult = stance != null ? Mathf.Max(0f, stance.VisibilityMult) : 1f;
+        float target = Mathf.Clamp01(env * stanceMult);
 
         float lambda = 1f - Mathf.Exp(-Mathf.Max(0f, settings.smoothing) * Time.deltaTime);
         float old = _current;

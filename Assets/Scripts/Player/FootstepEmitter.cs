@@ -1,4 +1,3 @@
-// Scripts/Player/FootstepEmitter.cs
 using UnityEngine;
 
 [RequireComponent(typeof(PlayerNoiseMeter))]
@@ -14,12 +13,18 @@ public class FootstepEmitter : MonoBehaviour
     public float currentSpeed = 0f;          // set from your movement script
     public float runSpeedThreshold = 3.5f;   // speed that counts as running
 
+    [Header("Optional stance")]
+    public MonoBehaviour stanceProvider;     // IStanceProvider
+    IStanceProvider stance;
+
     PlayerNoiseMeter _meter;
     float _timer;
 
     void Awake()
     {
         _meter = GetComponent<PlayerNoiseMeter>();
+        stance = stanceProvider as IStanceProvider;
+        if (stance == null) stance = GetComponent<IStanceProvider>();
     }
 
     void Update()
@@ -52,8 +57,11 @@ public class FootstepEmitter : MonoBehaviour
         float surf = profile.GetSurfaceFactor(currentSurfaceTag);
         float loud = baseLoud * surf;
 
+        // stance noise multiplier (defaults to 1 if no provider)
+        float noiseMult = stance != null ? Mathf.Max(0f, stance.NoiseMult) : 1f;
+
         // Optional shaping with curve peak
-        float shaped = loud * Mathf.Clamp01(profile.footstepCurve.Evaluate(1f));
+        float shaped = loud * Mathf.Clamp01(profile.footstepCurve.Evaluate(1f)) * noiseMult;
 
         _meter.AddBurst(shaped, Mathf.Max(0.01f, profile.baseDuration));
     }
