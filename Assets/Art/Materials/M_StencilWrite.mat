@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: DarknessMask
-  m_Shader: {fileID: 4800000, guid: 64b25130fb053194b8b00d008ce727b6, type: 3}
+  m_Name: M_StencilWrite
+  m_Shader: {fileID: 4800000, guid: 44e970aa78565fe4bbab50bcda6127e6, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -41,7 +41,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _AmbientDarkness: 0.1
+    - _Alpha: 0.25
     - _EnableExternalAlpha: 0
     - _ZWrite: 0
     m_Colors:

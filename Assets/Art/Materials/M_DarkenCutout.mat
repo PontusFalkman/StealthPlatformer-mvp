@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: M_Torch
-  m_Shader: {fileID: 4800000, guid: fc47f87d8bf26214d9205bc985a6b5f3, type: 3}
+  m_Name: M_DarkenCutout
+  m_Shader: {fileID: 4800000, guid: ea40bc5388a174442957ff74ef8650e6, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -16,7 +16,7 @@ Material:
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
+  m_CustomRenderQueue: 3100
   stringTagMap: {}
   disabledShaderPasses: []
   m_LockedProperties: 
@@ -41,13 +41,11 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _CoreAlpha: 0.9
+    - _Alpha: 0.25
     - _EnableExternalAlpha: 0
-    - _InnerFrac: 0.2
-    - _Steps: 3
     - _ZWrite: 0
     m_Colors:
-    - _Color: {r: 1, g: 1, b: 0.27058825, a: 1}
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _RendererColor: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

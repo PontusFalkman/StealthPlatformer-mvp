@@ -35,6 +35,10 @@ public class DarknessZone : MonoBehaviour
     public LightZone.UpdateMode updateMode = LightZone.UpdateMode.OnMove;
     [Min(1f)] public float fixedHz = 20f;
 
+    [Header("Light interaction")]
+    public bool lightCancelsDarkness = true;                 // lights punch holes in this patch
+    [Range(0f, 1f)] public float lightCancelFactor = 1f;     // 1 = full cancel
+
     float[] outerR;
     Vector2 lastOrigin;
     float nextUpdateTime;
@@ -109,19 +113,46 @@ public class DarknessZone : MonoBehaviour
         return Mathf.Ceil((1f - t) * s) / s;
     }
 
-    // Original API preserved
+    // Saturating sum of all light contributions at a point
+    static float TotalLightAt(Vector2 worldPos)
+    {
+        float vis = 0f;
+        var lights = LightZone.All;
+        for (int i = 0; i < lights.Count; i++)
+        {
+            var z = lights[i]; if (!z) continue;
+            float c = Mathf.Clamp01(z.VisibilityAt(worldPos));
+            vis = 1f - (1f - vis) * (1f - c);
+            if (vis >= 0.999f) break;
+        }
+        return vis;
+    }
+
+    // Darkness API (now reduced by light)
     public float DarknessAt(Vector2 worldPos)
     {
         Vector2 origin = Origin;
         float d = Vector2.Distance(worldPos, origin);
-        if (d <= innerRadius) return intensity;
+
+        // inside core
+        if (d <= innerRadius)
+        {
+            float baseDark = intensity;
+            if (!lightCancelsDarkness) return baseDark;
+            float l = TotalLightAt(worldPos);
+            return baseDark * Mathf.Clamp01(1f - lightCancelFactor * l);
+        }
 
         float rOuter = GetOuterRadiusAtAngle(Mathf.Atan2(worldPos.y - origin.y, worldPos.x - origin.x));
         if (d >= rOuter) return 0f;
 
         float t = Mathf.InverseLerp(innerRadius, rOuter, d);
         float f = useSteppedFalloff ? StepFalloff(t, steps) : Mathf.Clamp01(falloff.Evaluate(t));
-        return intensity * f;
+        float baseFalloffDark = intensity * f;
+
+        if (!lightCancelsDarkness) return baseFalloffDark;
+        float lightVis = TotalLightAt(worldPos);
+        return baseFalloffDark * Mathf.Clamp01(1f - lightCancelFactor * lightVis);
     }
 
     // Accessors for visualizers

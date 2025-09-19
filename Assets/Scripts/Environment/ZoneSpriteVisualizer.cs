@@ -17,32 +17,45 @@ public class ZoneSpriteVisualizer : MonoBehaviour
     public int sortingOrder = 0;
 
     [Header("Mesh shape")]
-    [Min(16)] public int rays = 96;           // angular samples
-    [Min(0f)] public float occlusionInset = 0.05f; // keep inside blockers
-    [Min(0f)] public float feather = 0.12f;   // soft rim width (0 = hard edge)
+    [Min(16)] public int rays = 96;                 // angular samples
+    [Min(0f)] public float occlusionInset = 0.05f;  // keep inside blockers
+    [Min(0f)] public float feather = 0.12f;         // soft rim width (0 = hard edge)
+
+    [Header("Rendering")]
+    public Material overrideMaterial;               // assign stencil-writer or any custom mat
 
     MeshFilter mf; MeshRenderer mr; Mesh mesh;
 
     void OnEnable() { Ensure(); Refresh(); }
     void OnValidate() { Ensure(); Refresh(); }
-    void Update() { if (!Application.isPlaying) Refresh(); }
+    void LateUpdate() { Refresh(); }
 
     void Ensure()
     {
-        mf = GetComponent<MeshFilter>();
-        mr = GetComponent<MeshRenderer>();
-        if (!mr.sharedMaterial) mr.sharedMaterial = new Material(Shader.Find("Sprites/Default"));
-        if (mesh == null) { mesh = new Mesh { name = "ZoneFillMesh" }; mesh.MarkDynamic(); }
+        if (!mf) mf = GetComponent<MeshFilter>();
+        if (!mr) mr = GetComponent<MeshRenderer>();
+
+        // material: respect overrideMaterial; otherwise keep existing; otherwise make default
+        if (overrideMaterial) mr.sharedMaterial = overrideMaterial;
+        else if (!mr.sharedMaterial) mr.sharedMaterial = new Material(Shader.Find("Sprites/Default"));
+
+        if (mesh == null)
+        {
+            mesh = new Mesh { name = "ZoneFillMesh" };
+            mesh.MarkDynamic();
+        }
         mf.sharedMesh = mesh;
+
         mr.sortingOrder = sortingOrder;
 
-        // Disable any legacy SpriteRenderer on the same GameObject.
+        // disable any SpriteRenderer on same GO
         var sr = GetComponent<SpriteRenderer>();
         if (sr) sr.enabled = false;
     }
 
     public void Refresh()
     {
+        if (!mr) return;
         if (!lightZone && !darkZone) { mr.enabled = false; return; }
         mr.enabled = true;
         BuildFilledMesh();
@@ -83,8 +96,8 @@ public class ZoneSpriteVisualizer : MonoBehaviour
             r = Mathf.Max(0f, r - occlusionInset);
 
             Vector2 dir = new(Mathf.Cos(a), Mathf.Sin(a));
-            Vector3 wPos = wOrigin + (Vector3)(dir * r);      // world point
-            verts[1 + i] = transform.InverseTransformPoint(wPos); // local point
+            Vector3 wPos = wOrigin + (Vector3)(dir * r);             // world point
+            verts[1 + i] = transform.InverseTransformPoint(wPos);    // local point
             cols[1 + i] = new Color(baseCol.r, baseCol.g, baseCol.b, coreAlpha);
 
             int t = i * 3;
@@ -126,5 +139,4 @@ public class ZoneSpriteVisualizer : MonoBehaviour
         mesh.SetTriangles(tris, 0);
         mesh.RecalculateBounds();
     }
-
 }

@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: M_DarkPatch
-  m_Shader: {fileID: 4800000, guid: fc47f87d8bf26214d9205bc985a6b5f3, type: 3}
+  m_Name: M_WriteLightStencil
+  m_Shader: {fileID: 4800000, guid: 44e970aa78565fe4bbab50bcda6127e6, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -41,13 +41,10 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _CoreAlpha: 0.9
     - _EnableExternalAlpha: 0
-    - _InnerFrac: 0.2
-    - _Steps: 5
     - _ZWrite: 0
     m_Colors:
-    - _Color: {r: 0.10196079, g: 0.10196079, b: 0.10196079, a: 1}
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _RendererColor: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

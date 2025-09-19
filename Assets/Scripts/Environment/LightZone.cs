@@ -49,11 +49,18 @@ public class LightZone : MonoBehaviour
         {
             case UpdateMode.OnMove: RebuildIfNeeded(false); break;
             case UpdateMode.FixedHz:
-                if (Time.time >= nextUpdateTime) { RebuildPolarCache(); nextUpdateTime = Time.time + 1f / fixedHz; }
+                if (Time.time >= nextUpdateTime)
+                {
+                    RebuildPolarCache();
+                    nextUpdateTime = Time.time + 1f / fixedHz;
+                }
                 break;
             case UpdateMode.Manual: break;
         }
     }
+
+    // Call this after changing any field at runtime (radius, falloff, masks, steps, etc.)
+    public void MarkDirty() { dirty = true; }
 
     void EnsureCache()
     {
@@ -106,7 +113,7 @@ public class LightZone : MonoBehaviour
         return Mathf.Ceil((1f - t) * s) / s;
     }
 
-    // Original API preserved
+    // Visibility API
     public float VisibilityAt(Vector2 worldPos)
     {
         Vector2 origin = transform.position;
@@ -121,7 +128,7 @@ public class LightZone : MonoBehaviour
         return intensity * f;
     }
 
-    // Accessors for visualizers
+    // Accessors for samplers/visualizers
     public float GetOuterRadiusAtAngle(float angleRad)
     {
         RebuildIfNeeded(!Application.isPlaying);
