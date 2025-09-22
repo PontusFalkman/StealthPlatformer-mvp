@@ -1,10 +1,10 @@
-namespace Stealth.Interact
+// Scripts/Input/IInteractInput.cs
+namespace Stealth.Inputs
 {
-    // Minimal input for interactions.
     public interface IInteractInput
     {
-        bool InteractPressed { get; }   // rising edge this frame
-        bool InteractHeld { get; }      // while held
-        bool InteractReleased { get; }  // falling edge this frame
+        bool InteractPressed { get; }   // edge this frame
+        bool InteractHeld { get; }      // held
+        bool InteractReleased { get; }  // edge on release
     }
 }

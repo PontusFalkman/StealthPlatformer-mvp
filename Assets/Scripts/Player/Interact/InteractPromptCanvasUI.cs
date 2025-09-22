@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using Stealth.Inputs;
 
 namespace Stealth.Interact
 {

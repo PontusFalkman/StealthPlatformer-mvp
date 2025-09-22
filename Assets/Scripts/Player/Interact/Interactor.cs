@@ -1,6 +1,7 @@
 ﻿// Scripts/Interact/Interactor.cs
 using System.Collections.Generic;
 using UnityEngine;
+using Stealth.Inputs;
 
 namespace Stealth.Interact
 {
