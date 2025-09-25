@@ -15,7 +15,7 @@ public class CarrierController : MonoBehaviour
     public float minThrowSpeed = 6f;
     public float maxThrowSpeed = 16f;
     public float chargeTime = 0.6f;
-    public float dropPush = 1.5f;
+    public float dropPush = 1.5f;               // kept for throws using AimDir if wanted elsewhere
     public float postThrowCooldown = 0.1f;
 
     [Header("Drop safety")]
@@ -64,17 +64,18 @@ public class CarrierController : MonoBehaviour
 
             if (input.InteractReleased)
             {
-                if (holdT >= 0.12f) Throw();
+                bool charged = holdT >= 0.20f;                 // raise threshold
+                bool hasAim = AimMagnitude() > 0.10f;          // require aim
+                if (charged && hasAim) Throw();
                 else Drop();
                 holdT = 0;
             }
             return;
         }
-
         if (cooldown <= 0 && input.InteractPressed) TryPick();
     }
 
-    // —— actions ——
+    // —— actions —— //
     void TryPick()
     {
         if (!finder.TryFind(out var c) || c == null) return;
@@ -85,20 +86,23 @@ public class CarrierController : MonoBehaviour
         cooldown = 0.05f;
         swallowRelease = true;
     }
+    float AimMagnitude()
+    {
+        if (aim != null) { var a = aim.Aim; return a.magnitude; }
+        if (moveInput != null) return Mathf.Abs(moveInput.MoveX);
+        return 0f;
+    }
 
     [System.Obsolete]
     void Drop()
     {
-        PlaceSafely();
         phys.ReleaseHeld(snap);
+        hands.Detach(held.transform, snap.originalScene);
 
-        Vector2 v = AimDir() * dropPush;
-        // if grounding directly, kill lateral drift
-        bool grounded = Physics2D.Raycast(snap.rb.position, Vector2.down, (HeldBounds().extents.y + 0.08f), groundMask);
-        if (grounded) v.x = 0f;
-
-        snap.rb.linearVelocity = v;
+        // downward bias only; velocity is applied inside Carryable
+        Vector2 v = new(0f, -0.75f);
         held.OnDropped(false, v);
+
         ClearHeld();
         cooldown = postThrowCooldown;
     }
@@ -119,7 +123,7 @@ public class CarrierController : MonoBehaviour
         cooldown = postThrowCooldown;
     }
 
-    // —— helpers ——
+    // —— helpers —— //
     [System.Obsolete]
     void PlaceSafely()
     {
@@ -128,7 +132,6 @@ public class CarrierController : MonoBehaviour
         Bounds b = HeldBounds();
         float probe = DynamicProbe();
 
-        // boxcast to find ground
         Vector2 from = snap.rb.position;
         Vector2 box = new(b.size.x * 0.95f, 0.02f);
         var hitBox = Physics2D.BoxCast(from, box, 0f, Vector2.down, probe, groundMask);

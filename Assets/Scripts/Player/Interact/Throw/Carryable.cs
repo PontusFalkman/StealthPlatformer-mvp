@@ -28,6 +28,9 @@ public class Carryable : MonoBehaviour, IInteractable, INoiseOverride
     [SerializeField] float dropClearance = 0.12f;
     [SerializeField] float dropSkin = 0.01f;
 
+    [Header("Drop Re-entry")]
+    public bool safeReentry = false;   // false = no kinematic hop
+
     protected Rigidbody2D rb;
     protected Collider2D col;
     protected bool isCarried;
@@ -37,14 +40,12 @@ public class Carryable : MonoBehaviour, IInteractable, INoiseOverride
     int originalLayer;
     PhysicsMaterial2D cachedMat;
 
-    // ignored while held
     Collider2D[] carrierCols;
     Transform carrierRoot;
 
-    // scale control
-    Vector3 originalLocalScale;        // local scale in scene (no parent)
-    Vector3 originalWorldScale;        // lossy world scale reference
-    const float MinAxisScale = 0.05f;  // guard against tiny scales
+    Vector3 originalLocalScale;
+    Vector3 originalWorldScale;
+    const float MinAxisScale = 0.05f;
 
     void Awake()
     {
@@ -56,7 +57,7 @@ public class Carryable : MonoBehaviour, IInteractable, INoiseOverride
         originalLayer = gameObject.layer;
 
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-        if (rb.linearDamping < 0.1f) rb.linearDamping = 0.1f; // Unity 6 stable API
+        if (rb.linearDamping < 0.1f) rb.linearDamping = 0.1f;
 
         originalLocalScale = transform.localScale;
         originalWorldScale = transform.lossyScale;
@@ -82,7 +83,6 @@ public class Carryable : MonoBehaviour, IInteractable, INoiseOverride
     {
         isCarried = true;
 
-        // ignore holder collisions
         carrierRoot = hand ? hand.root : null;
         carrierCols = carrierRoot ? carrierRoot.GetComponentsInChildren<Collider2D>(true) : null;
         if (carrierCols != null && col)
@@ -100,7 +100,6 @@ public class Carryable : MonoBehaviour, IInteractable, INoiseOverride
 
         if (col) { col.enabled = false; col.isTrigger = false; }
 
-        // keep world size constant even if hand has scale
         if (hand)
         {
             Vector3 targetLocal = WorldToLocalScale(originalWorldScale, hand);
@@ -118,12 +117,37 @@ public class Carryable : MonoBehaviour, IInteractable, INoiseOverride
 
     public virtual void OnDropped(bool asThrow, Vector2 velocity)
     {
-        // detach and restore world size
         transform.SetParent(null, true);
         transform.localScale = ClampScale(originalLocalScale);
-
-        StartCoroutine(SafeMaterializeAfterDrop(asThrow, velocity));
         isCarried = false;
+
+        if (!safeReentry) { ImmediateReentry(velocity); return; }
+        StartCoroutine(SafeMaterializeAfterDrop(asThrow, velocity));
+    }
+
+    // Fast path: skip kinematic phase. No lateral impulse added here.
+    void ImmediateReentry(Vector2 v)
+    {
+        // restore collisions with former carrier
+        if (carrierCols != null && col)
+            foreach (var cc in carrierCols) if (cc) Physics2D.IgnoreCollision(col, cc, false);
+        carrierCols = null; carrierRoot = null;
+
+        gameObject.layer = originalLayer;
+        if (col) { col.isTrigger = false; col.enabled = true; }
+
+        rb.bodyType = RigidbodyType2D.Dynamic;
+        rb.constraints = RigidbodyConstraints2D.None;
+        rb.gravityScale = originalGravity;
+        rb.simulated = true;
+
+        if (cachedMat == null)
+            cachedMat = new PhysicsMaterial2D { bounciness = bounciness, friction = friction };
+        foreach (var c in GetComponentsInChildren<Collider2D>(true)) c.sharedMaterial = cachedMat;
+
+        rb.linearVelocity = v;   // drop uses small downward bias
+        rb.angularVelocity = 0f;
+        rb.WakeUp();
     }
 
     IEnumerator SafeMaterializeAfterDrop(bool wasThrown, Vector2 v)
@@ -140,7 +164,7 @@ public class Carryable : MonoBehaviour, IInteractable, INoiseOverride
         yield return new WaitForFixedUpdate();
         Physics2D.SyncTransforms();
 
-        // Phase 2: relocate out of overlaps
+        // Phase 2: move out of overlaps
         Vector2 desired = rb.position;
         if (carrierRoot)
         {
@@ -150,34 +174,31 @@ public class Carryable : MonoBehaviour, IInteractable, INoiseOverride
         }
         rb.position = ResolveDepenetration(desired);
 
-        // Force trigger enter refresh
+        // refresh triggers
         if (col)
         {
-            col.enabled = false;
-            yield return null;
-            col.enabled = true;
+            col.enabled = false; yield return null; col.enabled = true;
         }
 
         yield return new WaitForFixedUpdate();
         Physics2D.SyncTransforms();
 
-        // Phase 3: dynamic object again
-        rb.bodyType = originalBodyType == RigidbodyType2D.Static ? RigidbodyType2D.Dynamic : originalBodyType;
+        // Phase 3: dynamic again
+        rb.bodyType = RigidbodyType2D.Dynamic;
         rb.constraints = RigidbodyConstraints2D.None;
 
         if (cachedMat == null)
             cachedMat = new PhysicsMaterial2D { bounciness = bounciness, friction = friction };
         foreach (var c in GetComponentsInChildren<Collider2D>(true)) c.sharedMaterial = cachedMat;
 
-        rb.linearVelocity = wasThrown ? v : Vector2.zero;
+        rb.linearVelocity = v;   // always use caller velocity
         rb.angularVelocity = 0f;
-        rb.Sleep();
+        rb.WakeUp();
 
-        // restore collisions with former carrier
+        // restore carrier collisions
         if (carrierCols != null && col)
             foreach (var cc in carrierCols) if (cc) Physics2D.IgnoreCollision(col, cc, false);
-        carrierCols = null;
-        carrierRoot = null;
+        carrierCols = null; carrierRoot = null;
 
         gameObject.SetActive(true);
         if (col) col.enabled = true;
@@ -222,7 +243,7 @@ public class Carryable : MonoBehaviour, IInteractable, INoiseOverride
         NoiseBus.Raise(new NoiseEvent(mag, impactNoiseRadius, surfaceTag, pt));
     }
 
-    // ---- scale helpers ----
+    // scale helpers
     static Vector3 WorldToLocalScale(Vector3 worldScale, Transform newParent)
     {
         Vector3 p = newParent ? newParent.lossyScale : Vector3.one;

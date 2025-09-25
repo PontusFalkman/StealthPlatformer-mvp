@@ -1,65 +1,35 @@
+// Scripts/Interact/Throw/CarryPhysics.cs
 using UnityEngine;
-using UnityEngine.SceneManagement; // add this
+using UnityEngine.SceneManagement;
 
-[AddComponentMenu("Stealth/Interact/Carry/Physics Toggle")]
+[AddComponentMenu("Stealth/Interact/Carry Physics")]
 public class CarryPhysics : MonoBehaviour
 {
-    public bool makeKinematicWhileHeld = true;
-    public bool disableColliderWhileHeld = true;
-
     public struct Snapshot
     {
         public Rigidbody2D rb;
-        public RigidbodyType2D originalType;
-        public Collider2D[] colliders;
-        public Bounds bounds;
+        public Transform originalParent;
         public Scene originalScene;
     }
 
+    // Capture references only. Do not change physics state here.
     public Snapshot MakeHeld(Carryable c)
     {
-        var rb = c.GetComponent<Rigidbody2D>();
-        var snap = new Snapshot
+        var rb = c ? c.GetComponent<Rigidbody2D>() : null;
+        return new Snapshot
         {
             rb = rb,
-            originalType = rb.bodyType,
-            colliders = c.GetComponentsInChildren<Collider2D>(true),
-            bounds = GetBounds(c.transform),
-            originalScene = c.gameObject.scene
+            originalParent = c ? c.transform.parent : null,
+            originalScene = c ? c.gameObject.scene : default
         };
-
-        if (makeKinematicWhileHeld)
-        {
-            rb.bodyType = RigidbodyType2D.Kinematic;
-            rb.linearVelocity = Vector2.zero;
-            rb.angularVelocity = 0f;
-        }
-        if (disableColliderWhileHeld)
-            foreach (var co in snap.colliders) if (co) co.enabled = false;
-
-        return snap;
     }
 
-    public void ReleaseHeld(in Snapshot snap)
+    // No impulses, no bodyType changes, no velocity writes.
+    public void ReleaseHeld(Snapshot s)
     {
-        if (!snap.rb) return;
-        if (disableColliderWhileHeld)
-            foreach (var co in snap.colliders) if (co) co.enabled = true;
-        if (makeKinematicWhileHeld)
-            snap.rb.bodyType = snap.originalType;
-    }
-
-    static Bounds GetBounds(Transform root)
-    {
-        var cols = root.GetComponentsInChildren<Collider2D>(true);
-        bool init = false;
-        Bounds b = new Bounds(root.position, Vector3.one * 0.1f);
-        foreach (var c in cols)
-        {
-            if (!c) continue;
-            if (!init) { b = c.bounds; init = true; }
-            else b.Encapsulate(c.bounds);
-        }
-        return b;
+        if (!s.rb) return;
+        // ensure transform sync before hand-off
+        Physics2D.SyncTransforms();
+        // leave rb state to Carryable.OnDropped
     }
 }
