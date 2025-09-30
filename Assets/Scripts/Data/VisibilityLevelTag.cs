@@ -1,9 +1,27 @@
 // Scripts/Stealth/VisibilityLevelTag.cs
 using UnityEngine;
+using System.Collections.Generic;
 
-[AddComponentMenu("Stealth/Visibility Level Tag")]
+[DisallowMultipleComponent]
 public class VisibilityLevelTag : MonoBehaviour
 {
-    [Tooltip("Which gameplay layer this object lives on, e.g. 0, 1, or 2.")]
-    public int level = 1;
+    public static readonly List<VisibilityLevelTag> All = new();
+
+    [Tooltip("Gameplay level for this object")]
+    public int level = 0;
+
+    public bool IsHidden => level > 0;
+
+    void OnEnable()
+    {
+        if (!All.Contains(this)) All.Add(this);
+    }
+
+    void OnDisable()
+    {
+        All.Remove(this);
+    }
+
+    // convenience accessor
+    public Vector2 Position => transform.position;
 }

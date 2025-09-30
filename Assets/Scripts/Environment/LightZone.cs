@@ -15,13 +15,20 @@ public class LightZone : MonoBehaviour
     [Range(0f, 1f)] public float intensity = 1f;
     public AnimationCurve falloff = AnimationCurve.EaseInOut(0, 1, 1, 0);
 
+    [Header("Gameplay")]
+    [Tooltip("Gameplay depth for occlusion/light logic.")]
+    public int level = 1;
+
     [Header("Stepped Falloff")]
     public bool useSteppedFalloff = true;
     [Min(1)] public int steps = 3;
 
-    [Header("Asymmetry & Occlusion")]
-    public bool useOcclusion = true;
+    [Header("Occlusion")]
+    [Tooltip("Physics layers to check for potential blockers.")]
     public LayerMask occluderMask = ~0;
+    [Tooltip("If true, only OcclusionCollider with matching VisibilityLevelTag.level blocks; non-marked colliders always block.")]
+    public bool matchLevel = true;
+
     [Min(16)] public int rays = 128;
     [Tooltip("Per-direction outer radius cap")]
     public float minOuter = 1f, maxOuter = 5f;
@@ -49,18 +56,11 @@ public class LightZone : MonoBehaviour
         {
             case UpdateMode.OnMove: RebuildIfNeeded(false); break;
             case UpdateMode.FixedHz:
-                if (Time.time >= nextUpdateTime)
-                {
-                    RebuildPolarCache();
-                    nextUpdateTime = Time.time + 1f / fixedHz;
-                }
+                if (Time.time >= nextUpdateTime) { RebuildPolarCache(); nextUpdateTime = Time.time + 1f / fixedHz; }
                 break;
             case UpdateMode.Manual: break;
         }
     }
-
-    // Call this after changing any field at runtime (radius, falloff, masks, steps, etc.)
-    public void MarkDirty() { dirty = true; }
 
     void EnsureCache()
     {
@@ -75,6 +75,8 @@ public class LightZone : MonoBehaviour
         Vector2 origin = transform.position;
         if (dirty || origin != lastOrigin || editor) RebuildPolarCache();
     }
+
+    static bool InMask(LayerMask m, int layer) => (m.value & (1 << layer)) != 0;
 
     void RebuildPolarCache()
     {
@@ -91,11 +93,40 @@ public class LightZone : MonoBehaviour
             float a = i * step;
             Vector2 dir = new(Mathf.Cos(a), Mathf.Sin(a));
             float r = outerNominal;
-            if (useOcclusion && occluderMask.value != 0)
+
+            if (occluderMask.value != 0)
             {
-                var hit = Physics2D.Raycast(origin, dir, outerNominal, occluderMask);
-                if (hit.collider && !hit.collider.isTrigger) r = Mathf.Max(0f, hit.distance);
+                var hits = Physics2D.RaycastAll(origin, dir, outerNominal, occluderMask);
+                float best = outerNominal;
+
+                for (int h = 0; h < hits.Length; h++)
+                {
+                    var hit = hits[h];
+                    var col = hit.collider;
+                    if (!col || col.isTrigger) continue;
+
+                    // If collider has OcclusionCollider, apply level rule (optional).
+                    if (col.GetComponent<OcclusionCollider>())
+                    {
+                        if (matchLevel)
+                        {
+                            var tag = col.GetComponentInParent<VisibilityLevelTag>();
+                            if (!tag || tag.level != level) continue;
+                        }
+                        best = Mathf.Min(best, hit.distance);
+                        break;
+                    }
+                    else
+                    {
+                        // Unmarked collider in occluderMask always blocks (e.g., Ground).
+                        best = Mathf.Min(best, hit.distance);
+                        break;
+                    }
+                }
+
+                r = best;
             }
+
             outerR[i] = Mathf.Clamp((r - occlusionInset), minOuter, maxOuter);
         }
 
@@ -113,7 +144,7 @@ public class LightZone : MonoBehaviour
         return Mathf.Ceil((1f - t) * s) / s;
     }
 
-    // Visibility API
+    // Sampling API
     public float VisibilityAt(Vector2 worldPos)
     {
         Vector2 origin = transform.position;
@@ -128,7 +159,6 @@ public class LightZone : MonoBehaviour
         return intensity * f;
     }
 
-    // Accessors for samplers/visualizers
     public float GetOuterRadiusAtAngle(float angleRad)
     {
         RebuildIfNeeded(!Application.isPlaying);
@@ -174,6 +204,14 @@ public class LightZone : MonoBehaviour
 
 #if UNITY_EDITOR
     void OnValidate() { EnsureCache(); dirty = true; }
+    void Reset()
+    {
+        // Sensible defaults
+        int walls = LayerMask.NameToLayer("Walls");
+        if (walls >= 0) occluderMask = 1 << walls;
+        matchLevel = true;
+        level = 1;
+    }
     void OnDrawGizmosSelected()
     {
         Gizmos.color = new Color(1f, 1f, 0.2f, 0.25f);

@@ -15,6 +15,10 @@ public class DarknessZone : MonoBehaviour
     [Range(0f, 1f)] public float intensity = 1f;
     public AnimationCurve falloff = AnimationCurve.EaseInOut(0, 1, 1, 0);
 
+    [Header("Gameplay")]
+    [Tooltip("Gameplay level for this darkness patch (0,1,2...)")]
+    public int level = 1;
+
     [Header("Occlusion fit")]
     [Min(0f)] public float occlusionInset = 0.05f;
 
@@ -113,7 +117,31 @@ public class DarknessZone : MonoBehaviour
         return Mathf.Ceil((1f - t) * s) / s;
     }
 
-    // Saturating sum of all light contributions at a point
+    // Original API preserved
+    public float DarknessAt(Vector2 worldPos)
+    {
+        Vector2 origin = Origin;
+        float d = Vector2.Distance(worldPos, origin);
+        if (d <= innerRadius) return intensity;
+
+        float rOuter = GetOuterRadiusAtAngle(Mathf.Atan2(worldPos.y - origin.y, worldPos.x - origin.x));
+        if (d >= rOuter) return 0f;
+
+        float t = Mathf.InverseLerp(innerRadius, rOuter, d);
+        float f = useSteppedFalloff ? StepFalloff(t, steps) : Mathf.Clamp01(falloff.Evaluate(t));
+        float baseDark = intensity * f;
+
+        if (lightCancelsDarkness)
+        {
+            // compute total light at this pos on the current visibility sample level
+            float totalLight = TotalLightAt(worldPos);
+            baseDark = Mathf.Clamp01(baseDark * (1f - totalLight * Mathf.Clamp01(lightCancelFactor)));
+        }
+
+        return baseDark;
+    }
+
+    // Sum visible contribution of lights on the SAME sample level as VisibilityField.SampleLevel.
     static float TotalLightAt(Vector2 worldPos)
     {
         float vis = 0f;
@@ -121,38 +149,13 @@ public class DarknessZone : MonoBehaviour
         for (int i = 0; i < lights.Count; i++)
         {
             var z = lights[i]; if (!z) continue;
+            // respect current sample level context
+            if (z.level != VisibilityField.SampleLevel) continue;
             float c = Mathf.Clamp01(z.VisibilityAt(worldPos));
             vis = 1f - (1f - vis) * (1f - c);
             if (vis >= 0.999f) break;
         }
         return vis;
-    }
-
-    // Darkness API (now reduced by light)
-    public float DarknessAt(Vector2 worldPos)
-    {
-        Vector2 origin = Origin;
-        float d = Vector2.Distance(worldPos, origin);
-
-        // inside core
-        if (d <= innerRadius)
-        {
-            float baseDark = intensity;
-            if (!lightCancelsDarkness) return baseDark;
-            float l = TotalLightAt(worldPos);
-            return baseDark * Mathf.Clamp01(1f - lightCancelFactor * l);
-        }
-
-        float rOuter = GetOuterRadiusAtAngle(Mathf.Atan2(worldPos.y - origin.y, worldPos.x - origin.x));
-        if (d >= rOuter) return 0f;
-
-        float t = Mathf.InverseLerp(innerRadius, rOuter, d);
-        float f = useSteppedFalloff ? StepFalloff(t, steps) : Mathf.Clamp01(falloff.Evaluate(t));
-        float baseFalloffDark = intensity * f;
-
-        if (!lightCancelsDarkness) return baseFalloffDark;
-        float lightVis = TotalLightAt(worldPos);
-        return baseFalloffDark * Mathf.Clamp01(1f - lightCancelFactor * lightVis);
     }
 
     // Accessors for visualizers
