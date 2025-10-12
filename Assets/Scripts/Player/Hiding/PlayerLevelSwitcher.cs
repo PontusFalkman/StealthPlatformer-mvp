@@ -52,14 +52,22 @@ public class PlayerLevelSwitcher : MonoBehaviour
     void Update()
     {
         if (Input.GetKeyDown(hideKey)) TryHideInFront();
-        if (Input.GetKeyDown(returnKey)) ReturnToNormal();
 
-        if (autoReenableOnExit && isHidden && currentWall)
+
+        if (isHidden && currentWall)
         {
-            if (!currentWall.ContainsPoint(transform.position, reenablePadding))
+            var pb = playerCol.bounds;
+            if (!currentWall.Intersects(pb, reenablePadding))
             {
+                // left the wall → restore
                 currentWall.SetGateOpen(false);
                 currentWall = null;
+                ApplyNormal();
+            }
+            else
+            {
+                // still on top → keep disabled
+                currentWall.SetGateOpen(true);
             }
         }
     }
@@ -80,21 +88,19 @@ public class PlayerLevelSwitcher : MonoBehaviour
         if (levelTag) levelTag.level = 0;
         if (debug) Debug.Log($"PlayerLevelSwitcher → normal, IsHidden={levelTag.IsHidden}");
     }
-
     void TryHideInFront()
     {
         var wall = FindNearestWall();
-        if (!wall) { if (debug) Debug.Log("PlayerLevelSwitcher: no WallHideTarget found."); return; }
+        if (!wall) { if (debug) Debug.Log("[PlayerLevelSwitcher] No WallHideTarget found"); return; }
 
+        if (debug) Debug.Log($"[PlayerLevelSwitcher] Hiding at {wall.name}");
         wall.SetGateOpen(true);
         currentWall = wall;
 
         SetPhysicsLayer(hidePhysicsLayer);
         SetRender(hideSortingLayer, hideSortingOrder);
         isHidden = true;
-
         if (levelTag) levelTag.level = 1;
-        if (debug) Debug.Log($"PlayerLevelSwitcher → hidden/in front, IsHidden={levelTag.IsHidden}");
     }
 
     void ReturnToNormal()

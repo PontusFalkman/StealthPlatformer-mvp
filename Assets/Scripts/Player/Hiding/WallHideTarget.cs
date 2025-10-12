@@ -19,9 +19,21 @@ public class WallHideTarget : MonoBehaviour
 
     public void SetGateOpen(bool open)
     {
-        if (colliders == null || colliders.Length == 0)
-            colliders = GetComponentsInChildren<Collider2D>(true);
-        foreach (var c in colliders) if (c) c.enabled = !open;
+        var list = (colliders != null && colliders.Length > 0)
+            ? colliders
+            : GetComponentsInChildren<Collider2D>(true);
+
+        int count = 0;
+        foreach (var c in list)
+        {
+            if (!c) continue;
+            if (c.isTrigger) continue;          // optional: ignore triggers
+            c.enabled = !open;
+            count++;
+        }
+#if UNITY_EDITOR
+        Debug.Log($"[WallHideTarget] SetGateOpen({open}) toggled {count} colliders on {name}");
+#endif
     }
 
     // Works even if colliders are disabled.
@@ -56,5 +68,11 @@ public class WallHideTarget : MonoBehaviour
         return acc ?? new Bounds(transform.position, Vector3.one * 0.01f);
 
         static Bounds Enc(Bounds a, Bounds b) { a.Encapsulate(b.min); a.Encapsulate(b.max); return a; }
+    }
+    public bool Intersects(Bounds pb, float padding)
+    {
+        var b = GetWorldBounds();
+        b.Expand(padding * 2f);
+        return b.Intersects(pb);
     }
 }
